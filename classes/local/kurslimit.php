@@ -144,6 +144,7 @@ class kurslimit {
             $url = new \moodle_url('/blocks/ai_control/kurslimit.php');
             return '<form method="post" action="' . $url->out() . '" style="' . $kasten . '">'
                 . self::modell_auswahl($coursecontext)
+                . self::wissen_knopf($coursecontext)
                 . '<div style="font-weight: bold; margin-bottom: 4px;">📊 Anfragen für Lernende begrenzen</div>'
                 . '<input type="hidden" name="sesskey" value="' . sesskey() . '">'
                 . '<input type="hidden" name="blockcontextid" value="' . $blockcontext->id . '">'
@@ -162,6 +163,21 @@ class kurslimit {
         $rest = max(0, $limit - self::verbraucht((int)$USER->id, $coursecontext, 'chat'));
         return '<div style="' . $kasten . '">💬 Chat in diesem Kurs: noch <strong>' . $rest . '</strong> von ' . $limit
             . ' Anfragen pro ' . $zeit . '.</div>';
+    }
+
+    /** Lokal (15.11.2026): Knopf zu den Wissensdateien des KI-Chats für diesen Kurs (block_ai_chat/kurswissen.php). */
+    private static function wissen_knopf(\context $coursecontext): string {
+        if (!class_exists('\\block_ai_chat\\local\\wissen') || \block_ai_chat\local\wissen::kursmaxdateien() === 0
+                || !has_capability('moodle/course:update', $coursecontext)) {
+            return '';
+        }
+        $namen = \block_ai_chat\local\wissen::kurs_dateinamen($coursecontext);
+        $url = new \moodle_url('/blocks/ai_chat/kurswissen.php', ['courseid' => $coursecontext->instanceid]);
+        $liste = $namen ? s(implode(', ', $namen)) : 'noch keine';
+        return '<div style="font-weight: bold; margin-bottom: 4px;">📚 Wissensdateien für den KI-Chat</div>'
+            . '<div style="color: #555; font-size: 0.85rem; margin-bottom: 6px;">Der Chat nutzt bei jeder Frage die passenden Stellen daraus '
+            . '(z. B. Aufgaben, Notebooks, Merkblätter – keine Lösungen). Jetzt: ' . $liste . '.</div>'
+            . '<a class="btn btn-secondary btn-sm" style="margin-bottom: 12px;" href="' . $url->out() . '">📚 Dateien hochladen und verwalten</a>';
     }
 
     /** Auswahlliste „KI-Modell für diesen Kurs“ (nur, wenn die Administration mehr als eine Verbindung angelegt hat). */
