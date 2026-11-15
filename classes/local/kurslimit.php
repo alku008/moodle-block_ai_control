@@ -174,9 +174,9 @@ class kurslimit {
         $namen = \block_ai_chat\local\wissen::kurs_dateinamen($coursecontext);
         $url = new \moodle_url('/blocks/ai_chat/kurswissen.php', ['courseid' => $coursecontext->instanceid]);
         $liste = $namen ? s(implode(', ', $namen)) : 'noch keine';
-        return '<div style="font-weight: bold; margin-bottom: 4px;">📚 Wissensdateien für den KI-Chat</div>'
-            . '<div style="color: #555; font-size: 0.85rem; margin-bottom: 6px;">Der Chat nutzt bei jeder Frage die passenden Stellen daraus '
-            . '(z. B. Aufgaben, Notebooks, Merkblätter – keine Lösungen). Jetzt: ' . $liste . '.</div>'
+        return '<div style="font-weight: bold; margin-bottom: 4px;">📚 Wissensdateien für den KI-Chat in diesem Kurs</div>'
+            . '<div style="color: #555; font-size: 0.85rem; margin-bottom: 6px;">📍 Gelten nur in diesem Kurs, für jede Persona. Der Chat nutzt '
+            . 'bei jeder Frage die passenden Stellen daraus (z. B. Aufgaben, Notebooks, Merkblätter – keine Lösungen). Jetzt: ' . $liste . '.</div>'
             . '<a class="btn btn-secondary btn-sm" style="margin-bottom: 12px;" href="' . $url->out() . '">📚 Dateien hochladen und verwalten</a>';
     }
 
