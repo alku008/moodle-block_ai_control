@@ -45,3 +45,7 @@ $string['savestate'] = 'Save';
 $string['toggleai'] = 'AI functions on/off';
 $string['unlockeduntil'] = 'Unlocked until:';
 $string['viewprompts'] = 'View prompts';
+
+// Local extension (15.11.2026).
+$string['kursmodelle'] = 'AI connections teachers can choose per course';
+$string['kursmodelledesc'] = 'Selected text connections of the AI Manager appear in the control center as "AI model for this course". Select none to hide the choice (the default of the AI Manager applies). New connections must be selected here.';

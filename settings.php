@@ -43,5 +43,20 @@ if ($hassiteconfig) {
                 '',
             )
         );
+        // Lokal (15.11.2026): Welche KI-Verbindungen (Chat-Modelle) Lehrkräfte im Kontrollzentrum für ihren Kurs wählen dürfen.
+        try {
+            $verbindungen = \block_ai_control\local\kurslimit::alle_textverbindungen();
+        } catch (\Throwable $e) {
+            $verbindungen = [];
+        }
+        $settings->add(
+            new admin_setting_configmultiselect(
+                'block_ai_control/kursmodelle',
+                new lang_string('kursmodelle', 'block_ai_control'),
+                new lang_string('kursmodelledesc', 'block_ai_control'),
+                array_keys($verbindungen),
+                $verbindungen
+            )
+        );
     }
 }

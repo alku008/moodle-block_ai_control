@@ -66,6 +66,12 @@ export const init = async(element, aiconfigObject) => {
     templateContext.showviewprompts = aiconfig.showviewprompts;
 
     currentTargetTime = aiconfig.expiresat;
+    // Lokaler Fix (14.11.2026): Ohne gespeicherte Freigabe ist expiresat 0 (Anzeige 1.1.1970), nach Ablauf liegt es in der
+    // Vergangenheit. Dann wie der Server beim Speichern (aiconfig::store) „jetzt + 90 Minuten“ vorschlagen. -1 = läuft nie ab.
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    if (currentTargetTime !== -1 && currentTargetTime <= nowSeconds) {
+        currentTargetTime = nowSeconds + 90 * 60;
+    }
 
     templateContext.expiresat = convertUnixtimeToDateElementFormat(currentTargetTime);
 

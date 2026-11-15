@@ -91,6 +91,9 @@ class block_ai_control extends block_base {
             'block_ai_control/ai_control',
             ['contextid' => $coursecontext->id, 'cancontrol' => has_capability('block/ai_control:control', $context)]
         );
+        // Lokale Erweiterung: Anfragen-Limit für Lernende (Formular für Lehrkräfte, Restanzeige für Lernende).
+        $this->content->text .= \block_ai_control\local\kurslimit::html($coursecontext, $context,
+            has_capability('block/ai_control:control', $context));
 
         return $this->content;
     }

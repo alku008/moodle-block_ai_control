@@ -27,6 +27,11 @@ defined('MOODLE_INTERNAL') || die();
 
 $callbacks = [
         [
+                // Lokale Erweiterung (15.11.2026): KI-Modell pro Kurs.
+                'hook' => \local_ai_manager\hook\connector_instance_override::class,
+                'callback' => \block_ai_control\local\kurslimit::class . '::modell_einsetzen',
+        ],
+        [
                 'hook' => \local_ai_manager\hook\additional_user_restriction::class,
                 'callback' => \block_ai_control\local\hook_callbacks::class . '::handle_additional_user_restriction',
         ],

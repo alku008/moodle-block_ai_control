@@ -170,5 +170,9 @@ class hook_callbacks {
                 )
             );
         }
+        // Lokale Erweiterung: Anfragen-Limit der Lehrkraft für diesen Kurs (siehe kurslimit.php).
+        if ($hook->is_allowed()) {
+            kurslimit::pruefen($hook, $coursecontext);
+        }
     }
 }
