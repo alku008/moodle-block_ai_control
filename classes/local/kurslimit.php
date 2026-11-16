@@ -138,23 +138,23 @@ class kurslimit {
         global $USER;
         $wert = self::wert($coursecontext);
         $max = self::hoechstwert();
-        $zeit = format_time(self::zeitraum());
-        $kasten = 'margin-top: 12px; padding: 10px 12px; border: 1px solid #d5e2f2; border-radius: 8px; background: #f8fafd; font-size: 0.9rem;';
+        $zeit = self::zeittext();
+        $kasten = 'margin-top: 12px; padding: 12px 14px; border: 1px solid #d5e2f2; border-radius: 8px; background: #f8fafd; font-size: 0.9rem;';
         if ($steuern) {
             $url = new \moodle_url('/blocks/ai_control/kurslimit.php');
-            return '<form method="post" action="' . $url->out() . '" style="' . $kasten . '">'
-                . self::modell_auswahl($coursecontext)
-                . self::wissen_knopf($coursecontext)
-                . '<div style="font-weight: bold; margin-bottom: 4px;">📊 Anfragen für Lernende begrenzen</div>'
+            $limit = self::titel('📊 Anfragen für Lernende begrenzen')
                 . '<input type="hidden" name="sesskey" value="' . sesskey() . '">'
                 . '<input type="hidden" name="blockcontextid" value="' . $blockcontext->id . '">'
-                . '<label style="display: block; margin: 0 0 6px 0;">Höchstens '
+                . '<label style="display: block; margin: 0 0 4px 0;">Höchstens '
                 . '<input type="number" name="kurslimit" min="0" max="' . $max . '" value="' . ($wert ?: '') . '" placeholder="' . $max . '" '
-                . 'style="width: 5em; padding: 2px 6px; border: 1px solid #8f959e; border-radius: 4px;"> Anfragen pro ' . $zeit
-                . ' und Funktion in diesem Kurs</label>'
-                . '<div style="color: #555; font-size: 0.85rem; margin-bottom: 6px;">Vorgabe der Administration: höchstens ' . $max
-                . ' (leer lassen = ' . $max . ').</div>'
-                . '<button type="submit" class="btn btn-secondary btn-sm">Einstellungen speichern</button></form>';
+                . 'style="width: 4.5em; padding: 2px 6px; border: 1px solid #8f959e; border-radius: 4px;"> Anfragen pro ' . $zeit
+                . ' – je Person und Funktion</label>'
+                . self::hinweis('Die Administration erlaubt höchstens ' . $max . '. Leeres Feld = ' . $max . '.');
+            // Drei Abschnitte, getrennt durch eine dezente Linie (Wunsch der Nutzerin, 16.11.2026).
+            $teile = array_filter([self::modell_auswahl($coursecontext), self::wissen_knopf($coursecontext), $limit]);
+            return '<form method="post" action="' . $url->out() . '" style="' . $kasten . '">'
+                . implode('<hr style="border: 0; border-top: 1px solid #cfd8e3; margin: 14px 0;">', $teile)
+                . '<button type="submit" class="btn btn-secondary btn-sm" style="margin-top: 10px;">Einstellungen speichern</button></form>';
         }
         if ($wert <= 0) {
             return '';
@@ -165,6 +165,22 @@ class kurslimit {
             . ' Anfragen pro ' . $zeit . '.</div>';
     }
 
+    /** Zeitraum als Text: „Tag“, „Woche“, „Stunde“ statt „1 Tag“. */
+    private static function zeittext(): string {
+        $sek = self::zeitraum();
+        $namen = [DAYSECS => 'Tag', WEEKSECS => 'Woche', HOURSECS => 'Stunde'];
+        return $namen[$sek] ?? format_time($sek);
+    }
+
+    private static function titel(string $text): string {
+        return '<div style="font-weight: bold; margin-bottom: 6px;">' . $text . '</div>';
+    }
+
+    private static function hinweis(string $text): string {
+        return '<div style="color: #5b6670; font-size: 0.85rem; line-height: 1.4; margin: 4px 0 0 0;">' . $text . '</div>';
+    }
+
+
     /** Lokal (15.11.2026): Knopf zu den Wissensdateien des KI-Chats für diesen Kurs (block_ai_chat/kurswissen.php). */
     private static function wissen_knopf(\context $coursecontext): string {
         if (!class_exists('\\block_ai_chat\\local\\wissen') || \block_ai_chat\local\wissen::kursmaxdateien() === 0
@@ -173,12 +189,22 @@ class kurslimit {
         }
         $namen = \block_ai_chat\local\wissen::kurs_dateinamen($coursecontext);
         $url = new \moodle_url('/blocks/ai_chat/kurswissen.php', ['courseid' => $coursecontext->instanceid]);
-        $liste = $namen ? s(implode(', ', $namen)) : 'noch keine';
-        return '<div style="font-weight: bold; margin-bottom: 4px;">📚 Wissensdateien für den KI-Chat in diesem Kurs</div>'
-            . '<div style="color: #555; font-size: 0.85rem; margin-bottom: 6px;">📍 Gelten nur in diesem Kurs, für jede Persona. Der Chat nutzt '
-            . 'bei jeder Frage die passenden Stellen daraus (z. B. Aufgaben, Notebooks, Merkblätter – keine Lösungen). Jetzt: ' . $liste . '.</div>'
-            . '<a class="btn btn-secondary btn-sm" style="margin-bottom: 12px;" href="' . $url->out() . '">📚 Dateien hochladen und verwalten</a>';
+        if ($namen) {
+            $liste = '<ul style="margin: 6px 0 8px 0; padding-left: 1.1rem; font-size: 0.82rem; color: #333;">'
+                . implode('', array_map(fn($n) => '<li style="margin: 1px 0; overflow-wrap: anywhere;">' . str_replace('_', '_<wbr>', s($n)) . '</li>', $namen))
+                . '</ul>';
+        } else {
+            $liste = '<div style="margin: 6px 0 8px 0; font-size: 0.82rem; color: #5b6670;">Noch keine Dateien hochgeladen.</div>';
+        }
+        return self::titel('📚 Wissen für den KI-Chat')
+            . self::hinweis('Gilt nur in diesem Kurs, für jede Persona. Bei jeder Frage sucht der Chat hier die passenden Stellen heraus. '
+                . 'Lade Aufgaben und Material hoch – keine Lösungen.')
+            . '<div style="margin-top: 8px; font-size: 0.85rem; font-weight: bold;">Hochgeladen (' . count($namen) . ' von '
+            . \block_ai_chat\local\wissen::kursmaxdateien() . '):</div>'
+            . $liste
+            . '<a class="btn btn-outline-secondary btn-sm" href="' . $url->out() . '">Dateien verwalten</a>';
     }
+
 
     /** Auswahlliste „KI-Modell für diesen Kurs“ (nur, wenn die Administration mehr als eine Verbindung angelegt hat). */
     private static function modell_auswahl(\context $coursecontext): string {
@@ -191,9 +217,9 @@ class kurslimit {
         foreach ($liste as $id => $name) {
             $optionen .= '<option value="' . $id . '"' . ($id === $gewaehlt ? ' selected' : '') . '>' . s($name) . '</option>';
         }
-        return '<div style="font-weight: bold; margin-bottom: 4px;">🧠 KI-Modell für diesen Kurs</div>'
-            . '<select name="kursmodell" class="custom-select form-select" style="width: 100%; margin-bottom: 4px;">' . $optionen . '</select>'
-            . '<div style="color: #555; font-size: 0.85rem; margin-bottom: 10px;">Gilt für Chat, Übersetzen, Feedback und Textaufgaben in diesem Kurs. '
-            . 'Die Modelle stellt die Administration bereit (AIS.chat).</div>';
+        return self::titel('🧠 KI-Modell für diesen Kurs')
+            . '<select name="kursmodell" class="custom-select form-select" style="width: 100%;">' . $optionen . '</select>'
+            . self::hinweis('Gilt für Chat, Übersetzen, Feedback und Textaufgaben. Welche Modelle es gibt, legt die Administration fest.');
     }
+
 }
