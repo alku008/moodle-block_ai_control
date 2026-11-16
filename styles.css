@@ -32,3 +32,15 @@ body:not(.editing) .block_ai_control .kurslimit-mehr {
 body:not(.editing) .block_ai_control .block_ai_control_config > .mb-2 {
     margin-bottom: 0 !important;
 }
+
+/* Lokal (16.11.2026): Auswahlliste „KI-Modell“ und Zahlenfeld im Kontrollzentrum mit Rahmen in hellerer Kachelfarbe. */
+.block_ai_control select,
+.block_ai_control input[type="number"],
+.block_ai_control input[type="datetime-local"] {
+    border: 1px solid var(--format-tiles-colour-5, #8f959e) !important;
+}
+.block_ai_control select:focus,
+.block_ai_control input:focus {
+    border-color: var(--format-tiles-colour, #0f6cbf) !important;
+    box-shadow: 0 0 0 0.2rem var(--format-tiles-colour-1, rgba(15, 108, 191, 0.25)) !important;
+}

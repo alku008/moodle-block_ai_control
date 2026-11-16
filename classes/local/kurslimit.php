@@ -147,7 +147,7 @@ class kurslimit {
                 . '<input type="hidden" name="blockcontextid" value="' . $blockcontext->id . '">'
                 . '<label style="display: block; margin: 0 0 4px 0;">Höchstens '
                 . '<input type="number" name="kurslimit" min="0" max="' . $max . '" value="' . ($wert ?: '') . '" placeholder="' . $max . '" '
-                . 'style="width: 4.5em; padding: 2px 6px; border: 1px solid #8f959e; border-radius: 4px;"> Anfragen pro ' . $zeit
+                . 'style="width: 4.5em; padding: 2px 6px; border-radius: 4px;"> Anfragen pro ' . $zeit
                 . ' – je Person und Funktion</label>'
                 . self::hinweis('Die Administration erlaubt höchstens ' . $max . '. Leeres Feld = ' . $max . '.');
             // Drei Abschnitte, getrennt durch eine dezente Linie (Wunsch der Nutzerin, 16.11.2026).
