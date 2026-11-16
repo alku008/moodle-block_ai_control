@@ -152,9 +152,16 @@ class kurslimit {
                 . self::hinweis('Die Administration erlaubt höchstens ' . $max . '. Leeres Feld = ' . $max . '.');
             // Drei Abschnitte, getrennt durch eine dezente Linie (Wunsch der Nutzerin, 16.11.2026).
             $teile = array_filter([self::modell_auswahl($coursecontext), self::wissen_knopf($coursecontext), $limit]);
-            return '<form method="post" action="' . $url->out() . '" style="' . $kasten . '">'
-                . implode('<hr style="border: 0; border-top: 1px solid #a9b6c6; opacity: 1; margin: 14px 0;">', $teile)
-                . '<button type="submit" class="btn btn-secondary btn-sm" style="margin-top: 10px;">Einstellungen speichern</button></form>';
+            $inhalt = implode('<hr style="border: 0; border-top: 1px solid #a9b6c6; opacity: 1; margin: 14px 0;">', $teile)
+                . '<button type="submit" class="btn btn-secondary btn-sm" style="margin-top: 10px;">Einstellungen speichern</button>';
+            // Außerhalb des Bearbeitungsmodus zugeklappt – oben bleiben die Schalter des Kontrollzentrums (Wunsch der Nutzerin, 16.11.2026).
+            global $PAGE;
+            $offen = $PAGE->user_is_editing() ? ' open' : '';
+            $zusammenfassung = self::zusammenfassung($coursecontext, $wert, $max);
+            return '<details' . $offen . ' style="' . $kasten . '">'
+                . '<summary style="cursor: pointer; font-weight: bold; color: #1d2125;">⚙️ Weitere KI-Einstellungen für diesen Kurs'
+                . '<div style="font-weight: normal; font-size: 0.8rem; color: #5b6670; margin: 2px 0 0 1.2rem;">' . $zusammenfassung . '</div></summary>'
+                . '<form method="post" action="' . $url->out() . '" style="margin-top: 12px;">' . $inhalt . '</form></details>';
         }
         if ($wert <= 0) {
             return '';
@@ -163,6 +170,17 @@ class kurslimit {
         $rest = max(0, $limit - self::verbraucht((int)$USER->id, $coursecontext, 'chat'));
         return '<div style="' . $kasten . '">💬 Chat in diesem Kurs: noch <strong>' . $rest . '</strong> von ' . $limit
             . ' Anfragen pro ' . $zeit . '.</div>';
+    }
+
+    /** Eine Zeile für die zugeklappte Ansicht: Modell · Wissensdateien · Limit. */
+    private static function zusammenfassung(\context $coursecontext, int $wert, int $max): string {
+        $id = self::modell($coursecontext);
+        $teile = [$id ? s(self::waehlbare_verbindungen()[$id]) : 'Modell: Vorgabe'];
+        if (class_exists('\\block_ai_chat\\local\\wissen') && \block_ai_chat\local\wissen::kursmaxdateien() > 0) {
+            $teile[] = count(\block_ai_chat\local\wissen::kurs_dateinamen($coursecontext)) . ' Wissensdateien';
+        }
+        $teile[] = 'höchstens ' . ($wert > 0 ? min($wert, $max) : $max) . ' Anfragen/' . self::zeittext();
+        return implode(' · ', $teile);
     }
 
     /** Zeitraum als Text: „Tag“, „Woche“, „Stunde“ statt „1 Tag“. */
