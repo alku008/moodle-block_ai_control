@@ -158,7 +158,9 @@ class kurslimit {
             global $PAGE;
             $offen = $PAGE->user_is_editing() ? ' open' : '';
             $zusammenfassung = self::zusammenfassung($coursecontext, $wert, $max);
-            return '<details' . $offen . ' style="' . $kasten . '">'
+            // Außerhalb des Bearbeitungsmodus speichert der Hauptschalter sofort (die übrigen Teile sind per styles.css ausgeblendet).
+            $PAGE->requires->js_init_code(self::SOFORT_SPEICHERN);
+            return '<details class="kurslimit-mehr"' . $offen . ' style="' . $kasten . '">'
                 . '<summary style="cursor: pointer; font-weight: bold; color: #1d2125;">⚙️ Weitere KI-Einstellungen für diesen Kurs'
                 . '<div style="font-weight: normal; font-size: 0.8rem; color: #5b6670; margin: 2px 0 0 1.2rem;">' . $zusammenfassung . '</div></summary>'
                 . '<form method="post" action="' . $url->out() . '" style="margin-top: 12px;">' . $inhalt . '</form></details>';
@@ -171,6 +173,26 @@ class kurslimit {
         return '<div style="' . $kasten . '">💬 Chat in diesem Kurs: noch <strong>' . $rest . '</strong> von ' . $limit
             . ' Anfragen pro ' . $zeit . '.</div>';
     }
+
+    /** Skript: Hauptschalter speichert ohne Bearbeitungsmodus sofort (klickt den ausgeblendeten Knopf „Speichern“). */
+    private const SOFORT_SPEICHERN = <<<'JS'
+if (!window.kurslimitSofort) {
+    window.kurslimitSofort = true;
+    document.addEventListener('change', function(e) {
+        if (document.body.classList.contains('editing')) {
+            return;
+        }
+        var schalter = e.target.closest('.block_ai_control [data-toggle-identifier="aiconfig_enabled"]');
+        if (!schalter) {
+            return;
+        }
+        var knopf = schalter.closest('.block_ai_control').querySelector('[data-aicontrol="submitbutton"]');
+        if (knopf) {
+            setTimeout(function() { knopf.click(); }, 50);
+        }
+    }, true);   // Erfassungsphase: der Schalter löst ein nicht aufsteigendes „change“ aus.
+}
+JS;
 
     /** Eine Zeile für die zugeklappte Ansicht: Modell · Wissensdateien · Limit. */
     private static function zusammenfassung(\context $coursecontext, int $wert, int $max): string {

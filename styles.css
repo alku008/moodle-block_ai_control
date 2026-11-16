@@ -1,3 +1,34 @@
 .block_ai_control .block_ai_control_config input[type="number"] {
     width: 3rem;
 }
+/* Lokal (16.11.2026, Wunsch der Nutzerin): Schalter und Speichern-Knopf in der Kachelfarbe des Kurses (format_tiles setzt
+   --format-tiles-colour; ohne Kachelformat bleibt Moodles Blau). */
+.block_ai_control .custom-switch .custom-control-input:checked ~ .custom-control-label::before,
+.block_ai_control .custom-control-input:checked,
+.block_ai_control .form-check-input:checked {
+    background-color: var(--format-tiles-colour, #0f6cbf) !important;
+    border-color: var(--format-tiles-colour, #0f6cbf) !important;
+}
+.block_ai_control .custom-control-input:focus ~ .custom-control-label::before {
+    box-shadow: 0 0 0 0.2rem var(--format-tiles-colour-5, rgba(15, 108, 191, 0.4));
+}
+.block_ai_control .btn-primary {
+    background-color: var(--format-tiles-colour, #0f6cbf);
+    border-color: var(--format-tiles-colour, #0f6cbf);
+}
+
+/* Lokal (16.11.2026): Außerhalb des Bearbeitungsmodus sehen Lehrkräfte nur den Schalter „KI-Funktionen an/aus“ (Umschalten speichert
+   sofort, siehe classes/local/kurslimit.php). Ablaufdatum, Funktionen, Knöpfe, Statusanzeige und weitere Einstellungen erscheinen im
+   Bearbeitungsmodus. Lernende (ohne Steuerrecht) sehen weiter die Statusanzeige. */
+body:not(.editing) .block_ai_control:has([data-aicontrol="config"]) > [data-aicontrol="info"],
+body:not(.editing) .block_ai_control:has([data-aicontrol="config"]) > hr,
+body:not(.editing) .block_ai_control [data-aicontrol="expirydate"],
+body:not(.editing) .block_ai_control [data-aicontrol="purposeslist"],
+body:not(.editing) .block_ai_control .block_ai_control_config > div:has([data-aicontrol="submitbutton"]),
+body:not(.editing) .block_ai_control .block_ai_control_config > div:has([data-aicontrol="viewpromptsbutton"]),
+body:not(.editing) .block_ai_control .kurslimit-mehr {
+    display: none !important;
+}
+body:not(.editing) .block_ai_control .block_ai_control_config > .mb-2 {
+    margin-bottom: 0 !important;
+}
