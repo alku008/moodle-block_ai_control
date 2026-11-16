@@ -153,7 +153,7 @@ class kurslimit {
             // Drei Abschnitte, getrennt durch eine dezente Linie (Wunsch der Nutzerin, 16.11.2026).
             $teile = array_filter([self::modell_auswahl($coursecontext), self::wissen_knopf($coursecontext), $limit]);
             return '<form method="post" action="' . $url->out() . '" style="' . $kasten . '">'
-                . implode('<hr style="border: 0; border-top: 1px solid #cfd8e3; margin: 14px 0;">', $teile)
+                . implode('<hr style="border: 0; border-top: 1px solid #a9b6c6; opacity: 1; margin: 14px 0;">', $teile)
                 . '<button type="submit" class="btn btn-secondary btn-sm" style="margin-top: 10px;">Einstellungen speichern</button></form>';
         }
         if ($wert <= 0) {
