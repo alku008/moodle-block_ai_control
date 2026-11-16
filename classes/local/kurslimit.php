@@ -154,13 +154,12 @@ class kurslimit {
             $teile = array_filter([self::modell_auswahl($coursecontext), self::wissen_knopf($coursecontext), $limit]);
             $inhalt = implode('<hr style="border: 0; border-top: 1px solid #a9b6c6; opacity: 1; margin: 14px 0;">', $teile)
                 . '<button type="submit" class="btn btn-secondary btn-sm" style="margin-top: 10px;">Einstellungen speichern</button>';
-            // Außerhalb des Bearbeitungsmodus zugeklappt – oben bleiben die Schalter des Kontrollzentrums (Wunsch der Nutzerin, 16.11.2026).
+            // Immer zugeklappt (auch im Bearbeitungsmodus; außerhalb ist der Bereich ganz ausgeblendet, Wunsch der Nutzerin 16.11.2026).
             global $PAGE;
-            $offen = $PAGE->user_is_editing() ? ' open' : '';
             $zusammenfassung = self::zusammenfassung($coursecontext, $wert, $max);
             // Außerhalb des Bearbeitungsmodus speichert der Hauptschalter sofort (die übrigen Teile sind per styles.css ausgeblendet).
             $PAGE->requires->js_init_code(self::SOFORT_SPEICHERN);
-            return '<details class="kurslimit-mehr"' . $offen . ' style="' . $kasten . '">'
+            return '<details class="kurslimit-mehr" style="' . $kasten . '">'
                 . '<summary style="cursor: pointer; font-weight: bold; color: #1d2125;">⚙️ Weitere KI-Einstellungen für diesen Kurs'
                 . '<div style="font-weight: normal; font-size: 0.8rem; color: #5b6670; margin: 2px 0 0 1.2rem;">' . $zusammenfassung . '</div></summary>'
                 . '<form method="post" action="' . $url->out() . '" style="margin-top: 12px;">' . $inhalt . '</form></details>';
