@@ -193,10 +193,33 @@ if (!window.kurslimitSofort) {
 }
 JS;
 
+    /** Verbindungsname ohne „AIS.chat – “ (für kurze Anzeigen). */
+    private static function kurzname(string $name): string {
+        return preg_replace('/^AIS\.chat\s*[–-]\s*/u', '', $name);
+    }
+
+    /**
+     * „Vorgabe der Administration: Qwen 3.5 (lokal)“ – bzw. getrennt für Lernende und Lehrkräfte, wenn die Administration im AI Manager
+     * dem Zweck „Chat“ für die beiden Rollen verschiedene Verbindungen zugeordnet hat (Wunsch der Nutzerin, 16.11.2026).
+     */
+    private static function vorgabe_text(bool $kurz = false): string {
+        global $DB;
+        $konfig = \core\di::get(config_manager::class);
+        $name = function (string $rolle) use ($konfig, $DB): string {
+            $id = (int)$konfig->get_config('purpose_chat_tool_' . $rolle);
+            $n = $id ? $DB->get_field('local_ai_manager_instance', 'name', ['id' => $id]) : false;
+            return $n ? self::kurzname($n) : '–';
+        };
+        $basis = $name('role_basic');
+        $erweitert = $name('role_extended');
+        $modelle = $basis === $erweitert ? $basis : 'Lernende: ' . $basis . ', Lehrkräfte: ' . $erweitert;
+        return $kurz ? 'Vorgabe: ' . $modelle : 'Vorgabe der Administration: ' . $modelle;
+    }
+
     /** Eine Zeile für die zugeklappte Ansicht: Modell · Wissensdateien · Limit. */
     private static function zusammenfassung(\context $coursecontext, int $wert, int $max): string {
         $id = self::modell($coursecontext);
-        $teile = [$id ? s(self::waehlbare_verbindungen()[$id]) : 'Modell: Vorgabe'];
+        $teile = [$id ? s(self::kurzname(self::waehlbare_verbindungen()[$id])) : s(self::vorgabe_text(true))];
         if (class_exists('\\block_ai_chat\\local\\wissen') && \block_ai_chat\local\wissen::kursmaxdateien() > 0) {
             $teile[] = count(\block_ai_chat\local\wissen::kurs_dateinamen($coursecontext)) . ' Wissensdateien';
         }
@@ -252,7 +275,7 @@ JS;
             return '';
         }
         $gewaehlt = self::modell($coursecontext);
-        $optionen = '<option value="0">Vorgabe der Administration</option>';
+        $optionen = '<option value="0">' . s(self::vorgabe_text()) . '</option>';
         foreach ($liste as $id => $name) {
             $optionen .= '<option value="' . $id . '"' . ($id === $gewaehlt ? ' selected' : '') . '>' . s($name) . '</option>';
         }
