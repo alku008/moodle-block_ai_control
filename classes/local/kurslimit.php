@@ -15,7 +15,23 @@ class kurslimit {
     /** Blockinstanz des Kontrollzentrums im Kurs (oder null). */
     public static function blockinstanz(\context $coursecontext): ?\stdClass {
         global $DB;
-        return $DB->get_record('block_instances', ['blockname' => 'ai_control', 'parentcontextid' => $coursecontext->id]) ?: null;
+        // Innerhalb einer Anfrage zwischenspeichern (wird je KI-Anfrage mehrfach gebraucht); Speichern leert den Speicher.
+        if (!array_key_exists($coursecontext->id, self::$bi)) {
+            self::$bi[$coursecontext->id] = $DB->get_record('block_instances',
+                ['blockname' => 'ai_control', 'parentcontextid' => $coursecontext->id], '*', IGNORE_MULTIPLE) ?: null;
+        }
+        return self::$bi[$coursecontext->id];
+    }
+
+    /** Zwischenspeicher je Anfrage. */
+    private static array $bi = [];
+    private static ?array $verbindungen = null;
+
+    /** configdata der Blockinstanz speichern (und Zwischenspeicher leeren). */
+    private static function config_schreiben(\stdClass $bi, \stdClass $config): void {
+        global $DB;
+        $DB->set_field('block_instances', 'configdata', base64_encode(serialize($config)), ['id' => $bi->id]);
+        self::$bi = [];
     }
 
     /** Von der Lehrkraft gesetztes Limit (0 = nur die Vorgabe der Administration). */
@@ -34,7 +50,7 @@ class kurslimit {
         $wert = max(0, min($wert, self::hoechstwert()));
         $config = !empty($bi->configdata) ? unserialize_object(base64_decode($bi->configdata)) : new \stdClass();
         $config->kurslimit = $wert;
-        $DB->set_field('block_instances', 'configdata', base64_encode(serialize($config)), ['id' => $bi->id]);
+        self::config_schreiben($bi, $config);
         return $wert;
     }
 
@@ -60,9 +76,9 @@ class kurslimit {
     /** Prüfung für den Haken additional_user_restriction (nur für Personen ohne Steuerrecht aufrufen). */
     public static function pruefen(\local_ai_manager\hook\additional_user_restriction $hook, \context $coursecontext): void {
         global $USER;
-        // Lokal (17.11.2026): während eines Tests kein KI-Chat (die Anfrage kommt von der Testseite, siehe Referer).
-        if (preg_match('#/mod/quiz/(attempt|summary)\.php#', $_SERVER['HTTP_REFERER'] ?? '')) {
-            $hook->set_access_allowed(false, 403, 'Während eines Tests ist die KI aus.');
+        // Lokal (17.11.2026): während eines Tests kein KI-Chat.
+        if (self::im_test((int)$USER->id, $coursecontext)) {
+            $hook->set_access_allowed(false, 429, 'Während eines Tests ist die KI aus.');
             return;
         }
         // Lokal (17.11.2026): Zeitplan der Lehrkraft (z. B. nur im Unterricht).
@@ -83,6 +99,21 @@ class kurslimit {
         }
     }
 
+    /**
+     * Läuft gerade ein Testversuch der Person in diesem Kurs? Geprüft auf dem Server (nicht über die aufrufende Seite, die der Browser
+     * mitteilt): ein offener Versuch, der in den letzten 3 Stunden bearbeitet wurde, oder ein offener Versuch, während die Anfrage von
+     * der Testseite kommt. Vorschauen der Lehrkräfte zählen nicht.
+     */
+    public static function im_test(int $userid, \context $coursecontext): bool {
+        global $DB;
+        $referer = get_local_referer(false);
+        $vontestseite = $referer && preg_match('#/mod/quiz/(attempt|summary)\.php#', $referer);
+        return $DB->record_exists_sql("SELECT 1 FROM {quiz_attempts} qa JOIN {quiz} q ON q.id = qa.quiz
+            WHERE qa.userid = ? AND q.course = ? AND qa.preview = 0 AND qa.state IN ('inprogress', 'overdue')"
+            . ($vontestseite ? '' : ' AND qa.timemodified > ?'),
+            [$userid, $coursecontext->instanceid, time() - 3 * HOURSECS]);
+    }
+
     /** Text-Funktionen, für die ein Kurs-Modell gilt (Bild, Bildanalyse, Sprache brauchen andere Modelle). */
     public const TEXTZWECKE = ['chat', 'singleprompt', 'translate', 'feedback', 'questiongeneration', 'agent'];
 
@@ -91,11 +122,13 @@ class kurslimit {
      * Einstellungen des Kontrollzentrums freigegeben hat (block_ai_control/kursmodelle; nie gespeichert = alle).
      */
     public static function waehlbare_verbindungen(): array {
-        $alle = self::alle_textverbindungen();
-        $freigabe = get_config('block_ai_control', 'kursmodelle');
-        if ($freigabe === false) {
-            return $alle;
+        // Ohne den Haken connector_instance_override (Erweiterung von local_ai_manager) wirkt eine Kurs-Auswahl nicht.
+        if (!class_exists('\\local_ai_manager\\hook\\connector_instance_override')) {
+            return [];
         }
+        $alle = self::alle_textverbindungen();
+        // Nie gespeichert = keine Auswahl (die Administration muss Modelle für Lehrkräfte ausdrücklich freigeben).
+        $freigabe = get_config('block_ai_control', 'kursmodelle');
         $ids = array_map('intval', array_filter(explode(',', (string)$freigabe), 'strlen'));
         return array_intersect_key($alle, array_flip($ids));
     }
@@ -103,6 +136,9 @@ class kurslimit {
     /** Alle aktiven Text-Verbindungen des Mandanten (Auswahl für die Administration). */
     public static function alle_textverbindungen(): array {
         global $DB;
+        if (self::$verbindungen !== null) {
+            return self::$verbindungen;
+        }
         $tenant = \core\di::get(config_manager::class)->get_tenant()->get_identifier();
         $liste = [];
         foreach ($DB->get_records('local_ai_manager_instance', ['tenant' => $tenant], 'name') as $r) {
@@ -112,7 +148,7 @@ class kurslimit {
                 $liste[(int)$r->id] = $r->name;
             }
         }
-        return $liste;
+        return self::$verbindungen = $liste;
     }
 
     /** Für den Kurs gewähltes Modell (Instanz-id) oder 0 = Vorgabe der Administration. */
@@ -128,7 +164,7 @@ class kurslimit {
         $id = isset(self::waehlbare_verbindungen()[$id]) ? $id : 0;
         $config = !empty($bi->configdata) ? unserialize_object(base64_decode($bi->configdata)) : new \stdClass();
         $config->kursmodell = $id;
-        $DB->set_field('block_instances', 'configdata', base64_encode(serialize($config)), ['id' => $bi->id]);
+        self::config_schreiben($bi, $config);
         return $id;
     }
 
@@ -151,6 +187,7 @@ class kurslimit {
         $zeit = self::zeittext();
         $kasten = 'margin-top: 12px; padding: 12px 14px; border: 1px solid #d5e2f2; border-radius: 8px; background: #f8fafd; font-size: 0.9rem;';
         if ($steuern) {
+            global $PAGE;
             $url = new \moodle_url('/blocks/ai_control/kurslimit.php');
             $limit = self::titel('📊 Anfragen für Lernende begrenzen')
                 . '<input type="hidden" name="sesskey" value="' . sesskey() . '">'
@@ -164,11 +201,10 @@ class kurslimit {
             $teile = array_filter([self::modell_auswahl($coursecontext) . self::persona_auswahl($coursecontext),
                 self::wissen_knopf($coursecontext), $limit,
                 self::zeitplan_feld($coursecontext),
-                self::auswertung($coursecontext)]);
+                $PAGE->user_is_editing() ? self::auswertung($coursecontext) : '']);
             $inhalt = implode('<hr style="border: 0; border-top: 1px solid #a9b6c6; opacity: 1; margin: 14px 0;">', $teile)
                 . '<button type="submit" class="btn btn-secondary btn-sm" style="margin-top: 10px;">Einstellungen speichern</button>';
             // Immer zugeklappt (auch im Bearbeitungsmodus; außerhalb ist der Bereich ganz ausgeblendet, Wunsch der Nutzerin 16.11.2026).
-            global $PAGE;
             $zusammenfassung = self::zusammenfassung($coursecontext, $wert, $max);
             // Außerhalb des Bearbeitungsmodus speichert der Hauptschalter sofort (die übrigen Teile sind per styles.css ausgeblendet).
             $PAGE->requires->js_init_code(self::SOFORT_SPEICHERN);
@@ -279,6 +315,10 @@ JS;
         if (!$themen) {
             return $html . self::hinweis('Noch keine Fragen mit Bezug zu den Wissensdateien.');
         }
+        // Datenschutz: Themen erst ab 5 Personen zeigen (sonst ließe sich auf einzelne Lernende schließen).
+        if ((int)$anfragen->personen < 5) {
+            return $html . self::hinweis('Themen werden erst angezeigt, wenn mindestens 5 Personen gefragt haben.');
+        }
         $max = max($themen);
         $html .= '<div style="margin-top: 8px;">';
         foreach (array_slice($themen, 0, 6, true) as $t => $n) {
@@ -323,7 +363,7 @@ JS;
         }
         $config = !empty($bi->configdata) ? unserialize_object(base64_decode($bi->configdata)) : new \stdClass();
         $config->zeitplan = implode("\n", $gut);
-        $DB->set_field('block_instances', 'configdata', base64_encode(serialize($config)), ['id' => $bi->id]);
+        self::config_schreiben($bi, $config);
         return [$config->zeitplan, $schlecht];
     }
 
@@ -339,6 +379,9 @@ JS;
                 return null;
             }
             $tage[] = self::TAGE[$t];
+        }
+        if ((int)$m[3] > 59 || (int)$m[5] > 59) {
+            return null;
         }
         $von = (int)$m[2] * 60 + (int)$m[3];
         $bis = (int)$m[4] * 60 + (int)$m[5];
@@ -416,13 +459,12 @@ JS;
         if ($personaid === (int)\block_ai_chat\local\persona::get_current_persona_id($chat->id)) {
             return null;
         }
+        if ($personaid !== 0 && !array_key_exists($personaid, \block_ai_chat\local\persona::get_all_personas((int)$USER->id))) {
+            return null;
+        }
         $DB->delete_records('block_ai_chat_personas_selected', ['contextid' => $chat->id]);
         if ($personaid === 0) {
             return 'Keine Persona';
-        }
-        $erlaubt = array_key_exists($personaid, \block_ai_chat\local\persona::get_all_personas((int)$USER->id));
-        if (!$erlaubt) {
-            return null;
         }
         $DB->insert_record('block_ai_chat_personas_selected', ['contextid' => $chat->id, 'personasid' => $personaid]);
         return $DB->get_field('block_ai_chat_personas', 'name', ['id' => $personaid]);

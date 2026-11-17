@@ -22,8 +22,8 @@ $bi = $DB->get_record('block_instances', ['id' => $bi->id], '*', MUST_EXIST);
 [$plan, $verworfen] = \block_ai_control\local\kurslimit::zeitplan_speichern($bi, optional_param('zeitplan', '', PARAM_TEXT));
 $persona = \block_ai_control\local\kurslimit::persona_speichern($coursecontext, optional_param('kurspersona', -1, PARAM_INT));
 $text = ($gespeichert > 0 ? "Limit: höchstens $gespeichert Anfragen." : 'Limit: Vorgabe der Administration.')
-    . ' Modell: ' . ($modell ? \block_ai_control\local\kurslimit::waehlbare_verbindungen()[$modell] : 'Vorgabe der Administration') . '.'
-    . ($plan !== '' ? ' Zeitplan: ' . str_replace("\n", '; ', $plan) . '.' : '')
-    . ($persona !== null ? ' Persona: ' . $persona . '.' : '')
+    . ' Modell: ' . ($modell ? s(\block_ai_control\local\kurslimit::waehlbare_verbindungen()[$modell]) : 'Vorgabe der Administration') . '.'
+    . ($plan !== '' ? ' Zeitplan: ' . s(str_replace("\n", '; ', $plan)) . '.' : '')
+    . ($persona !== null ? ' Persona: ' . s($persona) . '.' : '')
     . ($verworfen ? " $verworfen Zeile(n) im Zeitplan nicht verstanden (Beispiel: „Di 09:50-11:20“)." : '');
 redirect(new moodle_url('/course/view.php', ['id' => $coursecontext->instanceid]), $text, null, \core\output\notification::NOTIFY_SUCCESS);

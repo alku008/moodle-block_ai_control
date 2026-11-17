@@ -26,11 +26,11 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->release = 'v2.2 (AIS.chat Hamburg)';
-$plugin->version = 2025120401;
+$plugin->version = 2025120402;
 $plugin->requires = 2024042200;
-$plugin->supported = [500, 501];
+$plugin->supported = [500, 502];
 $plugin->component = 'block_ai_control';
 $plugin->maturity = MATURITY_STABLE;
 $plugin->dependencies = [
-    'local_ai_manager' => 2025071200,
+    'local_ai_manager' => 2026102307,   // mit den Haken connector_instance_override und 429 → gesperrt (Fork ais-chat-hamburg)
 ];
