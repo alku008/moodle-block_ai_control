@@ -60,6 +60,16 @@ class kurslimit {
     /** Prüfung für den Haken additional_user_restriction (nur für Personen ohne Steuerrecht aufrufen). */
     public static function pruefen(\local_ai_manager\hook\additional_user_restriction $hook, \context $coursecontext): void {
         global $USER;
+        // Lokal (17.11.2026): während eines Tests kein KI-Chat (die Anfrage kommt von der Testseite, siehe Referer).
+        if (preg_match('#/mod/quiz/(attempt|summary)\.php#', $_SERVER['HTTP_REFERER'] ?? '')) {
+            $hook->set_access_allowed(false, 403, 'Während eines Tests ist die KI aus.');
+            return;
+        }
+        // Lokal (17.11.2026): Zeitplan der Lehrkraft (z. B. nur im Unterricht).
+        if (($meldung = self::zeitplan_sperre($coursecontext)) !== '') {
+            $hook->set_access_allowed(false, 429, $meldung);
+            return;
+        }
         $limit = self::wert($coursecontext);
         if ($limit <= 0) {
             return;
@@ -151,7 +161,10 @@ class kurslimit {
                 . ' – je Person und Funktion</label>'
                 . self::hinweis('Die Administration erlaubt höchstens ' . $max . '. Leeres Feld = ' . $max . '.');
             // Drei Abschnitte, getrennt durch eine dezente Linie (Wunsch der Nutzerin, 16.11.2026).
-            $teile = array_filter([self::modell_auswahl($coursecontext), self::wissen_knopf($coursecontext), $limit]);
+            $teile = array_filter([self::modell_auswahl($coursecontext) . self::persona_auswahl($coursecontext),
+                self::wissen_knopf($coursecontext), $limit,
+                self::zeitplan_feld($coursecontext),
+                self::auswertung($coursecontext)]);
             $inhalt = implode('<hr style="border: 0; border-top: 1px solid #a9b6c6; opacity: 1; margin: 14px 0;">', $teile)
                 . '<button type="submit" class="btn btn-secondary btn-sm" style="margin-top: 10px;">Einstellungen speichern</button>';
             // Immer zugeklappt (auch im Bearbeitungsmodus; außerhalb ist der Bereich ganz ausgeblendet, Wunsch der Nutzerin 16.11.2026).
@@ -224,7 +237,195 @@ JS;
             $teile[] = count(\block_ai_chat\local\wissen::kurs_dateinamen($coursecontext)) . ' Wissensdateien';
         }
         $teile[] = 'höchstens ' . ($wert > 0 ? min($wert, $max) : $max) . ' Anfragen/' . self::zeittext();
+        if (self::zeitplan($coursecontext) !== '') {
+            $teile[] = '⏰ Zeitplan';
+        }
         return implode(' · ', $teile);
+    }
+
+    /**
+     * Lokal (17.11.2026, Wunsch der Nutzerin): Wonach wurde in den letzten 7 Tagen gefragt? Gezählt werden die Themen (Titel der
+     * Wissensdatei-Abschnitte, block_ai_chat_quellen) der Chat-Antworten in diesem Kurs – ohne einzelne Fragen und ohne Namen.
+     */
+    private static function auswertung(\context $coursecontext): string {
+        global $DB;
+        $dbman = $DB->get_manager();
+        if (!$dbman->table_exists('block_ai_chat_quellen')) {
+            return '';
+        }
+        $seit = time() - 7 * DAYSECS;
+        $anfragen = $DB->get_record_sql("SELECT COUNT(*) AS anzahl, COUNT(DISTINCT userid) AS personen
+            FROM {local_ai_manager_request_log} WHERE coursecontextid = ? AND purpose = 'chat' AND timecreated > ?",
+            [$coursecontext->id, $seit]);
+        $themen = [];
+        $rs = $DB->get_recordset_sql("SELECT q.quellen FROM {block_ai_chat_quellen} q
+            JOIN {local_ai_manager_request_log} l ON l.id = q.logid WHERE l.coursecontextid = ? AND l.timecreated > ?",
+            [$coursecontext->id, $seit]);
+        foreach ($rs as $r) {
+            // Pro Antwort zählt jedes Thema einmal; als Thema gilt der vordere Teil des Titels (z. B. „Lernpfad 7: Listen“).
+            $proantwort = [];
+            foreach ((array)json_decode($r->quellen, true) as $titel) {
+                $proantwort[trim(explode(' › ', preg_replace('/\s+[–-]\s+.*$/u', '', $titel))[0])] = true;
+            }
+            foreach (array_keys($proantwort) as $t) {
+                $themen[$t] = ($themen[$t] ?? 0) + 1;
+            }
+        }
+        $rs->close();
+        arsort($themen);
+        $html = self::titel('📈 Wonach in den letzten 7 Tagen gefragt wurde')
+            . self::hinweis((int)$anfragen->anzahl . ' Chat-Anfragen von ' . (int)$anfragen->personen . ' Personen. Themen aus den '
+                . 'Wissensdateien, ohne einzelne Fragen und ohne Namen.');
+        if (!$themen) {
+            return $html . self::hinweis('Noch keine Fragen mit Bezug zu den Wissensdateien.');
+        }
+        $max = max($themen);
+        $html .= '<div style="margin-top: 8px;">';
+        foreach (array_slice($themen, 0, 6, true) as $t => $n) {
+            $breite = max(6, (int)round(100 * $n / $max));
+            $html .= '<div style="font-size: 0.82rem; margin: 4px 0 1px 0; overflow-wrap: anywhere;">' . s($t) . ' <span style="color: #5b6670;">(' . $n . ')</span></div>'
+                . '<div style="height: 6px; border-radius: 3px; background: var(--format-tiles-colour-1, #e7eef7);">'
+                . '<div style="height: 6px; width: ' . $breite . '%; border-radius: 3px; background: var(--format-tiles-colour, #0f6cbf);"></div></div>';
+        }
+        return $html . '</div>';
+    }
+
+    // ---- Zeitplan (17.11.2026): KI für Lernende nur zu festen Zeiten, z. B. „Di 09:50-11:20“ (eine Zeile je Zeitraum). ----
+
+    private const TAGE = ['mo' => 1, 'di' => 2, 'mi' => 3, 'do' => 4, 'fr' => 5, 'sa' => 6, 'so' => 7];
+
+    /** Gespeicherter Zeitplan (Text, eine Zeile je Zeitraum; leer = keine Einschränkung). */
+    public static function zeitplan(\context $coursecontext): string {
+        $bi = self::blockinstanz($coursecontext);
+        $config = ($bi && !empty($bi->configdata)) ? unserialize_object(base64_decode($bi->configdata)) : new \stdClass();
+        return trim((string)($config->zeitplan ?? ''));
+    }
+
+    /**
+     * Zeitplan prüfen und speichern; ungültige Zeilen werden verworfen.
+     *
+     * @return array [gespeicherter Text, Anzahl verworfener Zeilen]
+     */
+    public static function zeitplan_speichern(\stdClass $bi, string $text): array {
+        global $DB;
+        $gut = [];
+        $schlecht = 0;
+        foreach (preg_split('/\R/', $text) as $zeile) {
+            $zeile = trim($zeile);
+            if ($zeile === '') {
+                continue;
+            }
+            if (self::zeile_lesen($zeile)) {
+                $gut[] = $zeile;
+            } else {
+                $schlecht++;
+            }
+        }
+        $config = !empty($bi->configdata) ? unserialize_object(base64_decode($bi->configdata)) : new \stdClass();
+        $config->zeitplan = implode("\n", $gut);
+        $DB->set_field('block_instances', 'configdata', base64_encode(serialize($config)), ['id' => $bi->id]);
+        return [$config->zeitplan, $schlecht];
+    }
+
+    /** „Mo,Di 08:00-09:30“ → [[1,2], 480, 570] oder null. */
+    private static function zeile_lesen(string $zeile): ?array {
+        if (!preg_match('/^([A-Za-zÄÖÜäöü,\s]+?)\s+(\d{1,2})[:.](\d{2})\s*[-–]\s*(\d{1,2})[:.](\d{2})$/u', $zeile, $m)) {
+            return null;
+        }
+        $tage = [];
+        foreach (preg_split('/[,\s]+/', \core_text::strtolower($m[1])) as $t) {
+            $t = \core_text::substr($t, 0, 2);
+            if (!isset(self::TAGE[$t])) {
+                return null;
+            }
+            $tage[] = self::TAGE[$t];
+        }
+        $von = (int)$m[2] * 60 + (int)$m[3];
+        $bis = (int)$m[4] * 60 + (int)$m[5];
+        return ($von < $bis && $bis <= 24 * 60) ? [$tage, $von, $bis] : null;
+    }
+
+    /** Leer, wenn die KI jetzt laut Zeitplan erlaubt ist, sonst die Meldung für Lernende. */
+    public static function zeitplan_sperre(\context $coursecontext): string {
+        $plan = self::zeitplan($coursecontext);
+        if ($plan === '') {
+            return '';
+        }
+        $jetzt = new \DateTime('now', \core_date::get_server_timezone_object());
+        $tag = (int)$jetzt->format('N');
+        $minute = (int)$jetzt->format('G') * 60 + (int)$jetzt->format('i');
+        foreach (preg_split('/\R/', $plan) as $zeile) {
+            $z = self::zeile_lesen(trim($zeile));
+            if ($z && in_array($tag, $z[0]) && $minute >= $z[1] && $minute < $z[2]) {
+                return '';
+            }
+        }
+        return 'Die KI ist in diesem Kurs nur zu diesen Zeiten freigeschaltet: ' . str_replace("\n", '; ', $plan) . '.';
+    }
+
+    /** Abschnitt „⏰ Zeitplan“ im Formular. */
+    private static function zeitplan_feld(\context $coursecontext): string {
+        $plan = self::zeitplan($coursecontext);
+        $status = $plan === '' ? 'Kein Zeitplan: Es gilt nur der Schalter oben.'
+            : (self::zeitplan_sperre($coursecontext) === '' ? '🟢 Gerade freigeschaltet.' : '⚪ Gerade außerhalb des Zeitplans.');
+        return self::titel('⏰ Zeitplan für Lernende (optional)')
+            . '<textarea name="zeitplan" rows="3" style="width: 100%; font-size: 0.85rem; padding: 4px 6px; border-radius: 4px;" '
+            . 'placeholder="Di 09:50-11:20&#10;Do 08:00-09:30">' . s($plan) . '</textarea>'
+            . self::hinweis('Eine Zeile je Zeitraum, z. B. „Di 09:50-11:20“ oder „Mo,Mi 08:00-09:30“. Außerhalb ist die KI für Lernende aus '
+                . '(zusätzlich zum Schalter oben). Während eines Tests ist sie immer aus. ' . $status);
+    }
+
+    // ---- Persona für den Kurs (17.11.2026): gilt für den KI-Chat-Block des Kurses; Lernende können sie nicht ändern. ----
+
+    /** Kontext des KI-Chat-Blocks im Kurs (oder null). */
+    public static function chatblock(\context $coursecontext): ?\context_block {
+        global $DB;
+        $bi = $DB->get_records('block_instances', ['blockname' => 'ai_chat', 'parentcontextid' => $coursecontext->id], 'id', 'id', 0, 1);
+        return $bi ? \context_block::instance(reset($bi)->id) : null;
+    }
+
+    private static function persona_auswahl(\context $coursecontext): string {
+        global $USER, $DB;
+        $chat = self::chatblock($coursecontext);
+        if (!$chat || !class_exists('\\block_ai_chat\\local\\persona') || !has_capability('block/ai_chat:edit', $chat)) {
+            return '';
+        }
+        $gewaehlt = \block_ai_chat\local\persona::get_current_persona_id($chat->id);
+        $optionen = '<option value="0">Keine Persona</option>';
+        foreach (\block_ai_chat\local\persona::get_all_personas((int)$USER->id) as $p) {
+            $optionen .= '<option value="' . (int)$p->id . '"' . ((int)$p->id === (int)$gewaehlt ? ' selected' : '') . '>' . s($p->name) . '</option>';
+        }
+        // Auch eine Persona, die eine andere Lehrkraft gewählt hat, soll in der Liste stehen.
+        if ($gewaehlt && strpos($optionen, 'value="' . (int)$gewaehlt . '"') === false
+                && ($name = $DB->get_field('block_ai_chat_personas', 'name', ['id' => $gewaehlt]))) {
+            $optionen .= '<option value="' . (int)$gewaehlt . '" selected>' . s($name) . '</option>';
+        }
+        return '<div style="margin-top: 12px;">' . self::titel('🎭 Persona für den KI-Chat')
+            . '<select name="kurspersona" class="custom-select form-select" style="width: 100%;">' . $optionen . '</select>'
+            . self::hinweis('Gilt für alle in diesem Kurs; Lernende können sie nicht ändern. Personas anlegen und bearbeiten: im KI-Chat über ⋮.')
+            . '</div>';
+    }
+
+    /** Persona speichern (nur mit Bearbeitungsrecht für den KI-Chat). */
+    public static function persona_speichern(\context $coursecontext, int $personaid): ?string {
+        global $DB, $USER;
+        $chat = self::chatblock($coursecontext);
+        if (!$chat || !has_capability('block/ai_chat:edit', $chat) || $personaid < 0) {
+            return null;
+        }
+        if ($personaid === (int)\block_ai_chat\local\persona::get_current_persona_id($chat->id)) {
+            return null;
+        }
+        $DB->delete_records('block_ai_chat_personas_selected', ['contextid' => $chat->id]);
+        if ($personaid === 0) {
+            return 'Keine Persona';
+        }
+        $erlaubt = array_key_exists($personaid, \block_ai_chat\local\persona::get_all_personas((int)$USER->id));
+        if (!$erlaubt) {
+            return null;
+        }
+        $DB->insert_record('block_ai_chat_personas_selected', ['contextid' => $chat->id, 'personasid' => $personaid]);
+        return $DB->get_field('block_ai_chat_personas', 'name', ['id' => $personaid]);
     }
 
     /** Zeitraum als Text: „Tag“, „Woche“, „Stunde“ statt „1 Tag“. */
