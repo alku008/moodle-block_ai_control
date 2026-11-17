@@ -301,6 +301,7 @@ JS;
             // Pro Antwort zählt jedes Thema einmal; als Thema gilt der vordere Teil des Titels (z. B. „Lernpfad 7: Listen“).
             $proantwort = [];
             foreach ((array)json_decode($r->quellen, true) as $titel) {
+                $titel = explode("\t", $titel)[0];   // Webseiten: „Titel<Tab>Adresse“
                 $proantwort[trim(explode(' › ', preg_replace('/\s+[–-]\s+.*$/u', '', $titel))[0])] = true;
             }
             foreach (array_keys($proantwort) as $t) {
@@ -493,21 +494,24 @@ JS;
             return '';
         }
         $namen = \block_ai_chat\local\wissen::kurs_dateinamen($coursecontext);
+        $links = method_exists('\\block_ai_chat\\local\\wissen', 'kurs_links') ? \block_ai_chat\local\wissen::kurs_links($coursecontext) : [];
         $url = new \moodle_url('/blocks/ai_chat/kurswissen.php', ['courseid' => $coursecontext->instanceid]);
-        if ($namen) {
+        if ($namen || $links) {
             $liste = '<ul style="margin: 6px 0 8px 0; padding-left: 1.1rem; font-size: 0.82rem; color: #333;">'
                 . implode('', array_map(fn($n) => '<li style="margin: 1px 0; overflow-wrap: anywhere;">' . str_replace('_', '_<wbr>', s($n)) . '</li>', $namen))
+                . implode('', array_map(fn($u, $n) => '<li style="margin: 1px 0; overflow-wrap: anywhere;">🌐 '
+                    . s(preg_replace('#^https?://(www\.)?#i', '', $u)) . ($n > 0 ? '' : ' ⚠️') . '</li>', array_keys($links), $links))
                 . '</ul>';
         } else {
             $liste = '<div style="margin: 6px 0 8px 0; font-size: 0.82rem; color: #5b6670;">Noch keine Dateien hochgeladen.</div>';
         }
         return self::titel('📚 Wissen für den KI-Chat')
             . self::hinweis('Gilt nur in diesem Kurs, für jede Persona. Bei jeder Frage sucht der Chat hier die passenden Stellen heraus. '
-                . 'Lade Aufgaben und Material hoch – keine Lösungen.')
+                . 'Lade Aufgaben und Material hoch oder nenne Webseiten – keine Lösungen.')
             . '<div style="margin-top: 8px; font-size: 0.85rem; font-weight: bold;">Hochgeladen (' . count($namen) . ' von '
-            . \block_ai_chat\local\wissen::kursmaxdateien() . '):</div>'
+            . \block_ai_chat\local\wissen::kursmaxdateien() . ')' . ($links ? ' und ' . count($links) . ' Webseite(n)' : '') . ':</div>'
             . $liste
-            . '<a class="btn btn-primary btn-sm" href="' . $url->out() . '">📚 Dateien verwalten</a>';
+            . '<a class="btn btn-primary btn-sm" href="' . $url->out() . '">📚 Dateien und Webseiten verwalten</a>';
     }
 
 
