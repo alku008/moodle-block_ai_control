@@ -465,7 +465,7 @@ JS;
             . '<div style="margin-top: 8px; font-size: 0.85rem; font-weight: bold;">Hochgeladen (' . count($namen) . ' von '
             . \block_ai_chat\local\wissen::kursmaxdateien() . '):</div>'
             . $liste
-            . '<a class="btn btn-outline-secondary btn-sm" href="' . $url->out() . '">Dateien verwalten</a>';
+            . '<a class="btn btn-primary btn-sm" href="' . $url->out() . '">📚 Dateien verwalten</a>';
     }
 
 
