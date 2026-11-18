@@ -65,6 +65,14 @@ const speichern = async(form) => {
             throw new Error('not ok');
         }
         zeigeStatus(form, 'Gespeichert. ' + ergebnis.meldung, true);
+        // Persona geändert? Dem offenen KI-Chat derselben Seite Bescheid geben (block_ai_chat, components/title.js).
+        const auswahl = form.querySelector('select[name="kurspersona"]');
+        if (auswahl && auswahl.dataset.chatcontextid) {
+            document.dispatchEvent(new CustomEvent('block_ai_control:persona', {detail: {
+                chatcontextid: parseInt(auswahl.dataset.chatcontextid),
+                personaid: parseInt(auswahl.value),
+            }}));
+        }
         const zusammenfassung = form.closest('.kurslimit-mehr')?.querySelector('.kurslimit-zusammenfassung');
         if (zusammenfassung && ergebnis.zusammenfassung) {
             zusammenfassung.innerHTML = ergebnis.zusammenfassung;
@@ -79,6 +87,33 @@ const speichern = async(form) => {
 };
 
 /**
+ * Persona list and selection from the AI chat of the same page (block_ai_chat): keep the select box in sync without reloading,
+ * e.g. after a persona has been renamed or chosen in the chat window.
+ *
+ * @param {CustomEvent} e event "block_ai_chat:personas"
+ */
+const personasAbgleichen = (e) => {
+    const detail = e.detail || {};
+    document.querySelectorAll(`select[name="kurspersona"][data-chatcontextid="${detail.chatcontextid}"]`).forEach((auswahl) => {
+        const keine = auswahl.querySelector('option[value="0"]');
+        const keinetext = keine ? keine.textContent : '–';
+        auswahl.innerHTML = '';
+        const neu = (wert, text) => {
+            const option = document.createElement('option');
+            option.value = String(wert);
+            option.textContent = text;
+            auswahl.appendChild(option);
+        };
+        neu(0, keinetext);
+        (detail.personas || []).filter((p) => p.id > 0).forEach((p) => neu(p.id, p.name));
+        if (detail.currentPersona && !auswahl.querySelector(`option[value="${detail.currentPersona}"]`)) {
+            neu(detail.currentPersona, '…');
+        }
+        auswahl.value = String(detail.currentPersona || 0);
+    });
+};
+
+/**
  * Set up the handlers (once per page).
  */
 export const init = () => {
@@ -86,6 +121,7 @@ export const init = () => {
         return;
     }
     eingerichtet = true;
+    document.addEventListener('block_ai_chat:personas', personasAbgleichen);
     document.addEventListener('submit', (e) => {
         const form = e.target.closest('form.kurslimit-form');
         if (!form || !window.fetch) {

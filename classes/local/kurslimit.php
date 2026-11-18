@@ -432,7 +432,7 @@ class kurslimit {
             $optionen .= '<option value="' . (int)$gewaehlt . '" selected>' . s($name) . '</option>';
         }
         return '<div style="margin-top: 12px;">' . self::titel('🎭 Persona für den KI-Chat')
-            . '<select name="kurspersona" class="custom-select form-select" style="width: 100%;">' . $optionen . '</select>'
+            . '<select name="kurspersona" class="custom-select form-select" style="width: 100%;" data-chatcontextid="' . $chat->id . '">' . $optionen . '</select>'
             . self::hinweis('Gilt für alle in diesem Kurs; Lernende können sie nicht ändern. Personas anlegen und bearbeiten: im KI-Chat über ⋮.')
             . '</div>';
     }
