@@ -203,15 +203,19 @@ class kurslimit {
                 self::zeitplan_feld($coursecontext),
                 $PAGE->user_is_editing() ? self::auswertung($coursecontext) : '']);
             $inhalt = implode('<hr style="border: 0; border-top: 1px solid #a9b6c6; opacity: 1; margin: 14px 0;">', $teile)
-                . '<button type="submit" class="btn btn-secondary btn-sm" style="margin-top: 10px;">Einstellungen speichern</button>';
+                . '<div style="margin-top: 10px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">'
+                . '<button type="submit" class="btn btn-primary btn-sm">Einstellungen speichern</button>'
+                . '<span class="kurslimit-status" role="status" aria-live="polite" style="font-size: 0.85rem;"></span></div>';
             // Immer zugeklappt (auch im Bearbeitungsmodus; außerhalb ist der Bereich ganz ausgeblendet, Wunsch der Nutzerin 16.11.2026).
             $zusammenfassung = self::zusammenfassung($coursecontext, $wert, $max);
             // Außerhalb des Bearbeitungsmodus speichert der Hauptschalter sofort (die übrigen Teile sind per styles.css ausgeblendet).
-            $PAGE->requires->js_init_code(self::SOFORT_SPEICHERN);
+            // Speichern ohne Neuladen (die Seite bleibt an der Stelle, ein Hinweis neben dem Knopf bestätigt es), amd/src/kurslimit.js.
+            $PAGE->requires->js_call_amd('block_ai_control/kurslimit', 'init');
             return '<details class="kurslimit-mehr" style="' . $kasten . '">'
                 . '<summary style="cursor: pointer; font-weight: bold; color: #1d2125;">⚙️ Weitere KI-Einstellungen für diesen Kurs'
-                . '<div style="font-weight: normal; font-size: 0.8rem; color: #5b6670; margin: 2px 0 0 1.2rem;">' . $zusammenfassung . '</div></summary>'
-                . '<form method="post" action="' . $url->out() . '" style="margin-top: 12px;">' . $inhalt . '</form></details>';
+                . '<div class="kurslimit-zusammenfassung" style="font-weight: normal; font-size: 0.8rem; color: #5b6670; margin: 2px 0 0 1.2rem;">'
+                . $zusammenfassung . '</div></summary>'
+                . '<form class="kurslimit-form" method="post" action="' . $url->out() . '" style="margin-top: 12px;">' . $inhalt . '</form></details>';
         }
         if ($wert <= 0) {
             return '';
@@ -222,25 +226,6 @@ class kurslimit {
             . ' Anfragen pro ' . $zeit . '.</div>';
     }
 
-    /** Skript: Hauptschalter speichert ohne Bearbeitungsmodus sofort (klickt den ausgeblendeten Knopf „Speichern“). */
-    private const SOFORT_SPEICHERN = <<<'JS'
-if (!window.kurslimitSofort) {
-    window.kurslimitSofort = true;
-    document.addEventListener('change', function(e) {
-        if (document.body.classList.contains('editing')) {
-            return;
-        }
-        var schalter = e.target.closest('.block_ai_control [data-toggle-identifier="aiconfig_enabled"]');
-        if (!schalter) {
-            return;
-        }
-        var knopf = schalter.closest('.block_ai_control').querySelector('[data-aicontrol="submitbutton"]');
-        if (knopf) {
-            setTimeout(function() { knopf.click(); }, 50);
-        }
-    }, true);   // Erfassungsphase: der Schalter löst ein nicht aufsteigendes „change“ aus.
-}
-JS;
 
     /** Verbindungsname ohne „AIS.chat – “ (für kurze Anzeigen). */
     private static function kurzname(string $name): string {
@@ -266,7 +251,7 @@ JS;
     }
 
     /** Eine Zeile für die zugeklappte Ansicht: Modell · Wissensdateien · Limit. */
-    private static function zusammenfassung(\context $coursecontext, int $wert, int $max): string {
+    public static function zusammenfassung(\context $coursecontext, int $wert, int $max): string {
         $id = self::modell($coursecontext);
         $teile = [$id ? s(self::kurzname(self::waehlbare_verbindungen()[$id])) : s(self::vorgabe_text(true))];
         if (class_exists('\\block_ai_chat\\local\\wissen') && \block_ai_chat\local\wissen::kursmaxdateien() > 0) {

@@ -26,4 +26,15 @@ $text = ($gespeichert > 0 ? "Limit: höchstens $gespeichert Anfragen." : 'Limit:
     . ($plan !== '' ? ' Zeitplan: ' . s(str_replace("\n", '; ', $plan)) . '.' : '')
     . ($persona !== null ? ' Persona: ' . s($persona) . '.' : '')
     . ($verworfen ? " $verworfen Zeile(n) im Zeitplan nicht verstanden (Beispiel: „Di 09:50-11:20“)." : '');
-redirect(new moodle_url('/course/view.php', ['id' => $coursecontext->instanceid]), $text, null, \core\output\notification::NOTIFY_SUCCESS);
+// Mit JavaScript (amd/src/kurslimit.js): Antwort als JSON, die Seite bleibt, wo sie ist.
+if (optional_param('ajax', 0, PARAM_BOOL)) {
+    $bi = $DB->get_record('block_instances', ['id' => $bi->id], '*', MUST_EXIST);
+    $wert = \block_ai_control\local\kurslimit::wert($coursecontext);
+    echo json_encode(['ok' => true, 'meldung' => $text,
+        'zusammenfassung' => \block_ai_control\local\kurslimit::zusammenfassung($coursecontext, $wert,
+            \block_ai_control\local\kurslimit::hoechstwert())], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+// Ohne JavaScript: zurück zum Kontrollzentrum (Sprungmarke des Blocks) statt an den Seitenanfang.
+redirect(new moodle_url('/course/view.php', ['id' => $coursecontext->instanceid], 'inst' . $bi->id), $text, null,
+    \core\output\notification::NOTIFY_SUCCESS);
