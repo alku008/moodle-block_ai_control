@@ -213,7 +213,7 @@ class kurslimit {
             $PAGE->requires->js_call_amd('block_ai_control/kurslimit', 'init');
             return '<details class="kurslimit-mehr" style="' . $kasten . '">'
                 . '<summary style="cursor: pointer; font-weight: bold; color: #1d2125;">⚙️ Weitere KI-Einstellungen für diesen Kurs'
-                . '<div class="kurslimit-zusammenfassung" style="font-weight: normal; font-size: 0.8rem; color: #5b6670; margin: 2px 0 0 1.2rem;">'
+                . '<div class="kurslimit-zusammenfassung" style="font-weight: normal; font-size: 0.8rem; color: #5b6670; margin: 2px 0 0 1.2rem; line-height: 1.4;">'
                 . $zusammenfassung . '</div></summary>'
                 . '<form class="kurslimit-form" method="post" action="' . $url->out() . '" style="margin-top: 12px;">' . $inhalt . '</form></details>';
         }
@@ -250,7 +250,7 @@ class kurslimit {
         return $kurz ? 'Vorgabe: ' . $modelle : 'Vorgabe der Administration: ' . $modelle;
     }
 
-    /** Eine Zeile für die zugeklappte Ansicht: Modell · Wissensdateien · Limit. */
+    /** Kurzübersicht für die zugeklappte Ansicht (Aufzählung): Modell, Wissensdateien, Limit, Zeitplan. */
     public static function zusammenfassung(\context $coursecontext, int $wert, int $max): string {
         $id = self::modell($coursecontext);
         $teile = [$id ? s(self::kurzname(self::waehlbare_verbindungen()[$id])) : s(self::vorgabe_text(true))];
@@ -261,7 +261,9 @@ class kurslimit {
         if (self::zeitplan($coursecontext) !== '') {
             $teile[] = '⏰ Zeitplan';
         }
-        return implode(' · ', $teile);
+        // Als Aufzählung (Wunsch der Nutzerin, 18.11.2026).
+        return '<ul style="margin: 2px 0 0 0; padding-left: 1.1rem;">'
+            . implode('', array_map(fn($t) => '<li style="margin: 0;">' . $t . '</li>', $teile)) . '</ul>';
     }
 
     /**
