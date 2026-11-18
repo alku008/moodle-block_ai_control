@@ -487,7 +487,7 @@ class kurslimit {
         // Webseiten stehen auf der Verwaltungsseite. Nicht lesbare Webseiten bleiben als ⚠️ sichtbar.
         $teile = [count($namen) . ' von ' . \block_ai_chat\local\wissen::kursmaxdateien() . ' Dateien hochgeladen'];
         if (\block_ai_chat\local\wissen::webmax() > 0) {
-            $teile[] = count($links) . ' von ' . \block_ai_chat\local\wissen::webmax() . ' Webseiten';
+            $teile[] = count($links) . ' von ' . \block_ai_chat\local\wissen::webmax() . ' Webseiten ausgewählt';
         }
         $fehler = count(array_filter($links, fn($n) => $n === 0));
         if ($fehler) {
