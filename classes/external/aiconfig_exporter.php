@@ -112,6 +112,11 @@ class aiconfig_exporter extends exporter {
         global $PAGE;
         $purposes = [];
         foreach (base_purpose::get_all_purposes() as $purpose) {
+            // Lokal (AIS.chat Hamburg): „Embedding“ arbeitet im Hintergrund für den KI-Chat (Suche in Wissensdateien) und gilt,
+            // sobald der Chat erlaubt ist – kein eigener Schalter für Lehrkräfte.
+            if ($purpose === 'embedding') {
+                continue;
+            }
             $purposeobject =
                 \core\di::get(\local_ai_manager\local\connector_factory::class)->get_purpose_by_purpose_string($purpose);
             $purposedata = purpose_exporter::export_purpose_data($aiconfig, $purposeobject);
