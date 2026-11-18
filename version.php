@@ -26,7 +26,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->release = 'v2.2 (AIS.chat Hamburg)';
-$plugin->version = 2025120406;
+$plugin->version = 2025120407;
 $plugin->requires = 2024042200;
 $plugin->supported = [500, 502];
 $plugin->component = 'block_ai_control';

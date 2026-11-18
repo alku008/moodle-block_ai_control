@@ -483,21 +483,24 @@ class kurslimit {
         $namen = \block_ai_chat\local\wissen::kurs_dateinamen($coursecontext);
         $links = method_exists('\\block_ai_chat\\local\\wissen', 'kurs_links') ? \block_ai_chat\local\wissen::kurs_links($coursecontext) : [];
         $url = new \moodle_url('/blocks/ai_chat/kurswissen.php', ['courseid' => $coursecontext->instanceid]);
-        if ($namen || $links) {
-            $liste = '<ul style="margin: 6px 0 8px 0; padding-left: 1.1rem; font-size: 0.82rem; color: #333;">'
-                . implode('', array_map(fn($n) => '<li style="margin: 1px 0; overflow-wrap: anywhere;">' . str_replace('_', '_<wbr>', s($n)) . '</li>', $namen))
-                . implode('', array_map(fn($u, $n) => '<li style="margin: 1px 0; overflow-wrap: anywhere;">🌐 '
-                    . s(preg_replace('#^https?://(www\.)?#i', '', $u)) . ($n > 0 ? '' : ' ⚠️') . '</li>', array_keys($links), $links))
-                . '</ul>';
-        } else {
-            $liste = '<div style="margin: 6px 0 8px 0; font-size: 0.82rem; color: #5b6670;">Noch keine Dateien hochgeladen.</div>';
+        // Nur die Anzahl, keine Liste (Wunsch der Nutzerin, 18.11.2026: sonst zu unübersichtlich); die einzelnen Dateien und
+        // Webseiten stehen auf der Verwaltungsseite. Nicht lesbare Webseiten bleiben als ⚠️ sichtbar.
+        $teile = [count($namen) . ' von ' . \block_ai_chat\local\wissen::kursmaxdateien() . ' Dateien'];
+        if (\block_ai_chat\local\wissen::webmax() > 0) {
+            $teile[] = count($links) . ' von ' . \block_ai_chat\local\wissen::webmax() . ' Webseiten';
         }
+        $fehler = count(array_filter($links, fn($n) => $n === 0));
+        if ($fehler) {
+            $teile[] = '<span style="color: #b3261e;">⚠️ ' . $fehler . ' Webseite(n) nicht lesbar</span>';
+        }
+        // Kleine graue Aufzählung wie die Kurzübersicht oben (Wunsch der Nutzerin, 18.11.2026).
+        $stand = '<ul style="margin: 6px 0 8px 0; padding-left: 1.1rem; font-size: 0.8rem; color: #5b6670; line-height: 1.4;">'
+            . implode('', array_map(fn($t) => '<li style="margin: 0;">' . $t . '</li>', $teile)) . '</ul>';
         return self::titel('📚 Wissen für den KI-Chat')
             . self::hinweis('Gilt nur in diesem Kurs, für jede Persona. Bei jeder Frage sucht der Chat hier die passenden Stellen heraus. '
-                . 'Lade Aufgaben und Material hoch oder nenne Webseiten – keine Lösungen.')
-            . '<div style="margin-top: 8px; font-size: 0.85rem; font-weight: bold;">Hochgeladen (' . count($namen) . ' von '
-            . \block_ai_chat\local\wissen::kursmaxdateien() . ')' . ($links ? ' und ' . count($links) . ' Webseite(n)' : '') . ':</div>'
-            . $liste
+                . 'Lade Aufgaben und Material hoch oder nenne Webseiten – keine Lösungen. Welche Dateien und Webseiten hinterlegt sind, '
+                . 'siehst und änderst du unter „Dateien und Webseiten verwalten“.')
+            . $stand
             . '<a class="btn btn-primary btn-sm" href="' . $url->out() . '">📚 Dateien und Webseiten verwalten</a>';
     }
 
