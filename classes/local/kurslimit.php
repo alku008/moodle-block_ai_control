@@ -485,7 +485,7 @@ class kurslimit {
         $url = new \moodle_url('/blocks/ai_chat/kurswissen.php', ['courseid' => $coursecontext->instanceid]);
         // Nur die Anzahl, keine Liste (Wunsch der Nutzerin, 18.11.2026: sonst zu unübersichtlich); die einzelnen Dateien und
         // Webseiten stehen auf der Verwaltungsseite. Nicht lesbare Webseiten bleiben als ⚠️ sichtbar.
-        $teile = [count($namen) . ' von ' . \block_ai_chat\local\wissen::kursmaxdateien() . ' Dateien'];
+        $teile = [count($namen) . ' von ' . \block_ai_chat\local\wissen::kursmaxdateien() . ' Dateien hochgeladen'];
         if (\block_ai_chat\local\wissen::webmax() > 0) {
             $teile[] = count($links) . ' von ' . \block_ai_chat\local\wissen::webmax() . ' Webseiten';
         }
@@ -498,7 +498,7 @@ class kurslimit {
             . implode('', array_map(fn($t) => '<li style="margin: 0;">' . $t . '</li>', $teile)) . '</ul>';
         return self::titel('📚 Wissen für den KI-Chat')
             . self::hinweis('Gilt nur in diesem Kurs, für jede Persona. Bei jeder Frage sucht der Chat hier die passenden Stellen heraus. '
-                . 'Lade Aufgaben und Material hoch oder nenne Webseiten – keine Lösungen. Welche Dateien und Webseiten hinterlegt sind, '
+                . 'Lade Aufgaben und Material hoch oder nenne Webseiten. Welche Dateien und Webseiten hinterlegt sind, '
                 . 'siehst und änderst du unter „Dateien und Webseiten verwalten“.')
             . $stand
             . '<a class="btn btn-primary btn-sm" href="' . $url->out() . '">📚 Dateien und Webseiten verwalten</a>';
