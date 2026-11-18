@@ -198,7 +198,7 @@ class kurslimit {
                 . ' – je Person und Funktion</label>'
                 . self::hinweis('Die Administration erlaubt höchstens ' . $max . '. Leeres Feld = ' . $max . '.');
             // Drei Abschnitte, getrennt durch eine dezente Linie (Wunsch der Nutzerin, 16.11.2026).
-            $teile = array_filter([self::modell_auswahl($coursecontext) . self::persona_auswahl($coursecontext),
+            $teile = array_filter([self::modell_auswahl($coursecontext), self::persona_auswahl($coursecontext),
                 self::wissen_knopf($coursecontext), $limit,
                 self::zeitplan_feld($coursecontext),
                 $PAGE->user_is_editing() ? self::auswertung($coursecontext) : '']);
@@ -431,7 +431,7 @@ class kurslimit {
                 && ($name = $DB->get_field('block_ai_chat_personas', 'name', ['id' => $gewaehlt]))) {
             $optionen .= '<option value="' . (int)$gewaehlt . '" selected>' . s($name) . '</option>';
         }
-        return '<div style="margin-top: 12px;">' . self::titel('🎭 Persona für den KI-Chat')
+        return '<div>' . self::titel('🎭 Persona für den KI-Chat')
             . '<select name="kurspersona" class="custom-select form-select" style="width: 100%;" data-chatcontextid="' . $chat->id . '">' . $optionen . '</select>'
             . self::hinweis('Gilt für alle in diesem Kurs; Lernende können sie nicht ändern. Personas anlegen und bearbeiten: im KI-Chat über ⋮.')
             . '</div>';
