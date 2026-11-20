@@ -491,9 +491,15 @@ class kurslimit {
         }
         // Lokal (19.11.2026): Dateien ohne lesbaren Text (z. B. eingescanntes PDF) – die KI kennt sie nicht.
         if (method_exists('\\block_ai_chat\\local\\wissen', 'kurs_dateistatus')) {
-            $ohnetext = count(\block_ai_chat\local\wissen::ohne_text(\block_ai_chat\local\wissen::kurs_dateistatus($coursecontext)));
+            $gekuerzt = method_exists('\\block_ai_chat\\local\\wissen', 'kurs_gekuerzt')
+                ? \block_ai_chat\local\wissen::kurs_gekuerzt($coursecontext) : [];
+            $ohnetext = count(\block_ai_chat\local\wissen::ohne_text(\block_ai_chat\local\wissen::kurs_dateistatus($coursecontext),
+                $gekuerzt));
             if ($ohnetext) {
                 $teile[] = '<span style="color: #b3261e;">⚠️ ' . $ohnetext . ' Datei(en) ohne lesbaren Text (z. B. Scan)</span>';
+            }
+            if ($gekuerzt) {
+                $teile[] = '<span style="color: #b3261e;">⚠️ ' . count($gekuerzt) . ' Datei(en) gekürzt – zu viel Text insgesamt</span>';
             }
         }
         $fehler = count(array_filter($links, fn($n) => $n === 0));
